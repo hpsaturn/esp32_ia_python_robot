@@ -14,6 +14,10 @@ treset = TouchPad(Pin(14))
 treset.config(500)               # configure the threshold at which the pin is considered touched
 pressKey = False
 
+def suspend():
+  esp32.wake_on_touch(True)
+  machine.lightsleep()
+
 def do_connect():
   import network
   import config
@@ -41,7 +45,7 @@ def motorLoop():
 
   max = 115  # not change
   min = 40   # not change
-  cut = 0
+  cut = 10
   step = 5
   ms = 0.001
 
@@ -51,7 +55,7 @@ def motorLoop():
     time.sleep(ms)
     printLine("s1:"+str(x)+" s2:"+str(max-(x-min)),36)
   
-  for x in range (min,max,step):
+  for x in range (min+cut,max-cut,step):
     servo2.duty(x)
     servo1.duty(max-(x-min))
     time.sleep(ms)
@@ -70,8 +74,7 @@ while True:
     time.sleep(1)
     oled.fill(0)
     oled.show()
-    esp32.wake_on_touch(True)
-    machine.lightsleep()
+    suspend()
 
   if pressKey:
     printLine("start",27)
@@ -80,5 +83,4 @@ while True:
     printLine("stop",27)
     time.sleep(.1)
     
-    
-  
+ 

@@ -1,4 +1,4 @@
-import machine, ssd1306, time, esp32
+import machine, ssd1306, time, esp32, os
 from machine import TouchPad, Pin
 
 i2c = machine.I2C(scl=machine.Pin(4), sda=machine.Pin(5))
@@ -35,6 +35,11 @@ def do_connect():
     oled.show()
   print('network config:', sta_if.ifconfig())
 
+def needsReboot():
+  files=os.listdir()
+  if 'reboot' in files:
+    os.remove('reboot')
+    machine.reset()
 
 def printLine(msg,y):
   oled.fill_rect(0,y,128,8,0)
@@ -82,5 +87,7 @@ while True:
   else:
     printLine("stop",27)
     time.sleep(.1)
+
+  needsReboot()
     
  

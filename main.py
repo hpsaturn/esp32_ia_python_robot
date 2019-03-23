@@ -1,14 +1,17 @@
 import machine, ssd1306, time, esp32, os
 from machine import TouchPad, Pin
+from microMLP import MicroMLP
 
 i2c = machine.I2C(scl=machine.Pin(4), sda=machine.Pin(5))
 oled = ssd1306.SSD1306_I2C(128, 64, i2c, 0x3c)
-servo1 = machine.PWM(machine.Pin(13), freq=50)
-servo2 = machine.PWM(machine.Pin(15), freq=50)
+
 tstop = TouchPad(Pin(0))
 treset = TouchPad(Pin(14))
 tstop.config(500)               # configure the threshold at which the pin is considered touched
 treset.config(500)             
+
+servo1 = machine.PWM(machine.Pin(13), freq=50)
+servo2 = machine.PWM(machine.Pin(15), freq=50)
 
 def startServos():
   servo1.duty(77)
@@ -71,14 +74,9 @@ def motorLoop():
     servo1.duty(max-(x-min))
     time.sleep(ms)
     printLine("s1:"+str(x)+" s2:"+str(max-(x-min)),36)
- 
-def main():
-  clearScreen()
-  printLine("Starting..",0)
-  startServos()
-  startWifi()
-  pressKey = False
 
+def watchDog():
+  pressKey = False
   while True:
     if tstop.read()<320:
       pressKey=not pressKey
@@ -98,6 +96,37 @@ def main():
       time.sleep(.5)
 
     needsReboot()
+
+def xorProblem():
+  mlp = MicroMLP.Create( neuronsByLayers           = [2, 2, 1],
+                       activationFuncName        = MicroMLP.ACTFUNC_SIGMOID,
+                       layersAutoConnectFunction = MicroMLP.LayersFullConnect )
+
+  nnFalse  = MicroMLP.NNValue.FromBool(False)
+  nnTrue   = MicroMLP.NNValue.FromBool(True)
+
+  mlp.AddExample( [nnFalse, nnFalse], [nnFalse] )
+  mlp.AddExample( [nnFalse, nnTrue ], [nnTrue ] )
+  mlp.AddExample( [nnTrue , nnTrue ], [nnFalse] )
+  mlp.AddExample( [nnTrue , nnFalse], [nnTrue ] )
+
+  learnCount = mlp.LearnExamples()
+
+  print( "LEARNED :" )
+  print( "  - False xor False = %s" % mlp.Predict([nnFalse, nnFalse])[0].AsBool )
+  print( "  - False xor True  = %s" % mlp.Predict([nnFalse, nnTrue] )[0].AsBool )
+  print( "  - True  xor True  = %s" % mlp.Predict([nnTrue , nnTrue] )[0].AsBool )
+  print( "  - True  xor False = %s" % mlp.Predict([nnTrue , nnFalse])[0].AsBool )
+
+  if mlp.SaveToFile("mlp.json") :
+    print( "MicroMLP structure saved!" )
+  
+def main():
+  clearScreen()
+  printLine("Starting..",0)
+  startServos()
+  startWifi()
+  watchDog()
 
 main()
       

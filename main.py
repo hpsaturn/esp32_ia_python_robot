@@ -95,7 +95,7 @@ def watchDog():
       printLine("stop",27)
       time.sleep(.5)
 
-    needsReboot()
+    needsReboot()  # if send empty file for reboot
 
 def xorProblem():
   mlp = MicroMLP.Create( neuronsByLayers           = [2, 2, 1],

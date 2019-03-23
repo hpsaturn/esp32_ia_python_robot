@@ -2,23 +2,32 @@ import machine, ssd1306, time, esp32, os
 from machine import TouchPad, Pin
 
 i2c = machine.I2C(scl=machine.Pin(4), sda=machine.Pin(5))
+oled = ssd1306.SSD1306_I2C(128, 64, i2c, 0x3c)
 servo1 = machine.PWM(machine.Pin(13), freq=50)
 servo2 = machine.PWM(machine.Pin(15), freq=50)
-servo1.duty(77)
-servo2.duty(77)
-oled = ssd1306.SSD1306_I2C(128, 64, i2c, 0x3c)
-
 tstop = TouchPad(Pin(0))
-tstop.config(500)               # configure the threshold at which the pin is considered touched
 treset = TouchPad(Pin(14))
-treset.config(500)               # configure the threshold at which the pin is considered touched
-pressKey = False
+tstop.config(500)               # configure the threshold at which the pin is considered touched
+treset.config(500)             
+
+def startServos():
+  servo1.duty(77)
+  servo2.duty(77)
+
+def printLine(msg,y):
+  oled.fill_rect(0,y,128,8,0)
+  oled.text(msg, 0, y)
+  oled.show()
+
+def clearScreen():
+  oled.fill(0)
+  oled.show()
 
 def suspend():
   esp32.wake_on_touch(True)
-  machine.lightsleep()
+  machine.deepsleep()
 
-def do_connect():
+def startWifi():
   import network
   import config
   sta_if = network.WLAN(network.STA_IF)
@@ -28,7 +37,7 @@ def do_connect():
     sta_if.connect(config.WIFI_SSID, config.WIFI_PASS)
     while not sta_if.isconnected():
       pass
-    oled.fill(0)
+    clearScreen()
     oled.text("ssid:"+str(config.WIFI_SSID), 0, 0)
     oled.text("link:"+str(sta_if.isconnected()), 0, 9)
     oled.text(str(sta_if.ifconfig()[0]), 0, 18)
@@ -38,13 +47,10 @@ def do_connect():
 def needsReboot():
   files=os.listdir()
   if 'reboot' in files:
+    printLine("rebooting..",27)
+    time.sleep(.5)
     os.remove('reboot')
     machine.reset()
-
-def printLine(msg,y):
-  oled.fill_rect(0,y,128,8,0)
-  oled.text(msg, 0, y)
-  oled.show()
 
 def motorLoop():
 
@@ -66,28 +72,33 @@ def motorLoop():
     time.sleep(ms)
     printLine("s1:"+str(x)+" s2:"+str(max-(x-min)),36)
  
+def main():
+  clearScreen()
+  printLine("Starting..",0)
+  startServos()
+  startWifi()
+  pressKey = False
 
-do_connect()
+  while True:
+    if tstop.read()<320:
+      pressKey=not pressKey
+      time.sleep(.1)
 
-while True:
-  if tstop.read()<300:
-    pressKey=not pressKey
-    time.sleep(.5)
+    if treset.read()<450:
+      printLine("suspend..",27)
+      time.sleep(.5)
+      clearScreen() 
+      suspend()
 
-  if treset.read()<500:
-    printLine("suspend..",27)
-    time.sleep(1)
-    oled.fill(0)
-    oled.show()
-    suspend()
+    if pressKey:
+      printLine("start",27)
+      motorLoop()
+    else:
+      printLine("stop",27)
+      time.sleep(.5)
 
-  if pressKey:
-    printLine("start",27)
-    motorLoop()
-  else:
-    printLine("stop",27)
-    time.sleep(.1)
+    needsReboot()
 
-  needsReboot()
-    
+main()
+      
  

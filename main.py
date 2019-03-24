@@ -61,10 +61,16 @@ def motorLoop():
   min = 40   # not change
   cut = 5
   step = 5
+  phase_right = 2
   ms = 0.001
+  x1 = 0
 
   for x in range (min+cut,max-cut,step):
-    servo1.duty(x)
+    if x1 < (max-cut):
+      x1 = x1 + (x * phase_right)
+    else:
+      x1 = max - cut
+    servo1.duty(x1)
     servo2.duty(max-(x-min))
     time.sleep(ms)
     printLine("s1:"+str(x)+" s2:"+str(max-(x-min)),36)

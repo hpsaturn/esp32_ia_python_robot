@@ -14,8 +14,8 @@ servo1 = machine.PWM(machine.Pin(13), freq=50)
 servo2 = machine.PWM(machine.Pin(15), freq=50)
 
 def startServos():
-  servo1.duty(77)
-  servo2.duty(77)
+  servo1.duty(83)  # right servo from OLED board
+  servo2.duty(71)  # left servo
 
 def printLine(msg,y):
   oled.fill_rect(0,y,128,8,0)
@@ -59,7 +59,7 @@ def motorLoop():
 
   max = 115  # not change
   min = 40   # not change
-  cut = 10
+  cut = 5
   step = 5
   ms = 0.001
 
@@ -78,11 +78,11 @@ def motorLoop():
 def watchDog():
   pressKey = False
   while True:
-    if tstop.read()<320:
+    if tstop.read()<300:
       pressKey=not pressKey
       time.sleep(.1)
 
-    if treset.read()<450:
+    if treset.read()<460:
       printLine("suspend..",27)
       time.sleep(.5)
       clearScreen() 
@@ -93,7 +93,8 @@ def watchDog():
       motorLoop()
     else:
       printLine("stop",27)
-      time.sleep(.5)
+      startServos()
+      time.sleep(1)
 
     needsReboot()  # if send empty file for reboot
 

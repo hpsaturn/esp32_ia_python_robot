@@ -1,6 +1,7 @@
 import machine, ssd1306, time, esp32, os
 from machine import TouchPad, Pin
 from microMLP import MicroMLP
+from umqtt.simple import MQTTClient
 
 i2c = machine.I2C(scl=machine.Pin(4), sda=machine.Pin(5))
 oled = ssd1306.SSD1306_I2C(128, 64, i2c, 0x3c)
@@ -12,10 +13,24 @@ treset.config(500)
 
 servo1 = machine.PWM(machine.Pin(13), freq=50)
 servo2 = machine.PWM(machine.Pin(15), freq=50)
+servos_running = False
 
-def startServos():
+c = MQTTClient("umqtt_client", "192.168.178.37", 1883)
+
+
+def initServos():
   servo1.duty(83)  # right servo from OLED board
   servo2.duty(71)  # left servo
+
+def stopServos():
+  printLine("stop",27)
+  initServos()
+
+def startServos():
+  printLine("start",27)
+  global servos_running 
+  servos_running = True
+  motorLoop()
 
 def printLine(msg,y):
   oled.fill_rect(0,y,128,8,0)
@@ -47,13 +62,16 @@ def startWifi():
     oled.show()
   print('network config:', sta_if.ifconfig())
 
+def reboot():
+  printLine("rebooting..",27)
+  time.sleep(.5)
+  machine.reset()
+
 def needsReboot():
   files=os.listdir()
   if 'reboot' in files:
-    printLine("rebooting..",27)
-    time.sleep(.5)
     os.remove('reboot')
-    machine.reset()
+    reboot()
 
 def motorLoop():
 
@@ -81,11 +99,27 @@ def motorLoop():
     time.sleep(ms)
     printLine("s1:"+str(x)+" s2:"+str(max-(x-min)),36)
 
+def mqttSubscriptionCallback(topic, msg):
+    print("mqtt: "+str((msg)))
+    global servos_running
+    if msg == (b"start"):
+      servos_running = True
+    if msg == (b"stop"):
+      servos_running = False
+    if msg == (b"reboot"):
+      reboot()
+
+def startMQTTChannel():
+    c.set_callback(mqttSubscriptionCallback)
+    c.connect()
+    c.subscribe(b"robot_msgs")
+
 def watchDog():
-  pressKey = False
+  global servos_running
   while True:
+    c.check_msg()
     if tstop.read()<300:
-      pressKey=not pressKey
+      servos_running=not servos_running
       time.sleep(.1)
 
     if treset.read()<460:
@@ -94,12 +128,10 @@ def watchDog():
       clearScreen() 
       suspend()
 
-    if pressKey:
-      printLine("start",27)
-      motorLoop()
+    if servos_running:
+      startServos() 
     else:
-      printLine("stop",27)
-      startServos()
+      stopServos() 
       time.sleep(1)
 
     needsReboot()  # if send empty file for reboot
@@ -131,8 +163,9 @@ def xorProblem():
 def main():
   clearScreen()
   printLine("Starting..",0)
-  startServos()
+  initServos()
   startWifi()
+  startMQTTChannel()
   watchDog()
 
 main()

@@ -91,13 +91,15 @@ def motorLoop():
     servo1.duty(x1)
     servo2.duty(max-(x-min))
     time.sleep(ms)
-    printLine("s1:"+str(x)+" s2:"+str(max-(x-min)),36)
+    sout = "s1:"+str(x)+" s2:"+str(max-(x-min))
+    printLine(sout,36)
   
   for x in range (min+cut,max-cut,step):
     servo2.duty(x)
     servo1.duty(max-(x-min))
     time.sleep(ms)
-    printLine("s1:"+str(x)+" s2:"+str(max-(x-min)),36)
+    sout = "s1:"+str(max-(x-min))+" s1:"+str(x)
+    printLine(sout,45)
 
 def mqttSubscriptionCallback(topic, msg):
     print("mqtt: "+str((msg)))
@@ -120,6 +122,10 @@ def watchDog():
     c.check_msg()
     if tstop.read()<300:
       servos_running=not servos_running
+      if servos_running:
+        c.publish(b"robot_msgs", bytes("key_start",'utf-8'))
+      else:
+        c.publish(b"robot_msgs", bytes("key_stop",'utf-8'))
       time.sleep(.1)
 
     if treset.read()<460:

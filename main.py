@@ -1,6 +1,5 @@
 import machine, ssd1306, time, esp32, os
 from machine import TouchPad, Pin
-from microMLP import MicroMLP
 from umqtt.simple import MQTTClient
 
 i2c = machine.I2C(scl=machine.Pin(4), sda=machine.Pin(5))
@@ -115,6 +114,10 @@ def startMQTTChannel():
     c.set_callback(mqttSubscriptionCallback)
     c.connect()
     c.subscribe(b"robot_msgs")
+    sendMQTTMessage("robot ready")
+
+def sendMQTTMessage(msg):
+  c.publish(b"robot_msgs", bytes(msg,'utf-8'))
 
 def watchDog():
   global servos_running
@@ -123,9 +126,9 @@ def watchDog():
     if tstop.read()<300:
       servos_running=not servos_running
       if servos_running:
-        c.publish(b"robot_msgs", bytes("key_start",'utf-8'))
+        sendMQTTMessage("key_start")
       else:
-        c.publish(b"robot_msgs", bytes("key_stop",'utf-8'))
+        sendMQTTMessage("key_stop")
       time.sleep(.1)
 
     if treset.read()<460:
@@ -142,30 +145,6 @@ def watchDog():
 
     needsReboot()  # if send empty file for reboot
 
-def xorProblem():
-  mlp = MicroMLP.Create( neuronsByLayers           = [2, 2, 1],
-                       activationFuncName        = MicroMLP.ACTFUNC_SIGMOID,
-                       layersAutoConnectFunction = MicroMLP.LayersFullConnect )
-
-  nnFalse  = MicroMLP.NNValue.FromBool(False)
-  nnTrue   = MicroMLP.NNValue.FromBool(True)
-
-  mlp.AddExample( [nnFalse, nnFalse], [nnFalse] )
-  mlp.AddExample( [nnFalse, nnTrue ], [nnTrue ] )
-  mlp.AddExample( [nnTrue , nnTrue ], [nnFalse] )
-  mlp.AddExample( [nnTrue , nnFalse], [nnTrue ] )
-
-  learnCount = mlp.LearnExamples()
-
-  print( "LEARNED :" )
-  print( "  - False xor False = %s" % mlp.Predict([nnFalse, nnFalse])[0].AsBool )
-  print( "  - False xor True  = %s" % mlp.Predict([nnFalse, nnTrue] )[0].AsBool )
-  print( "  - True  xor True  = %s" % mlp.Predict([nnTrue , nnTrue] )[0].AsBool )
-  print( "  - True  xor False = %s" % mlp.Predict([nnTrue , nnFalse])[0].AsBool )
-
-  if mlp.SaveToFile("mlp.json") :
-    print( "MicroMLP structure saved!" )
-  
 def main():
   clearScreen()
   printLine("Starting..",0)

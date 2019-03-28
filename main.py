@@ -16,6 +16,7 @@ servos_running = False
 
 c = MQTTClient("umqtt_client", "192.168.178.37", 1883)
 
+suspend_count = 0
 
 def initServos():
   servo1.duty(83)  # right servo from OLED board
@@ -41,8 +42,23 @@ def clearScreen():
   oled.show()
 
 def suspend():
+  printLine("suspend..",27)
+  sendMQTTMessage("suspended")
+  time.sleep(.5)
+  clearScreen()
   esp32.wake_on_touch(True)
   machine.deepsleep()
+
+def goToSuspend():
+  global suspend_count
+  suspend_count += 1
+  if suspend_count > 600: # suspend robot on inactivity
+    suspend_count = 0
+    suspend()
+
+def resetSuspendCount():
+  global suspend_count
+  suspend_count = 0
 
 def startWifi():
   import network
@@ -132,26 +148,28 @@ def watchDog():
       time.sleep(.1)
 
     if treset.read()<460:
-      printLine("suspend..",27)
-      time.sleep(.5)
-      clearScreen() 
       suspend()
 
     if servos_running:
+      resetSuspendCount()
       startServos() 
     else:
       stopServos() 
       time.sleep(1)
+      goToSuspend() 
 
     needsReboot()  # if send empty file for reboot
 
 def main():
-  clearScreen()
-  printLine("Starting..",0)
-  initServos()
-  startWifi()
-  startMQTTChannel()
-  watchDog()
+  try:
+    clearScreen()
+    printLine("Starting..",0)
+    initServos()
+    startWifi()
+    startMQTTChannel()
+    watchDog()
+  except:
+    machine.reset()
 
 main()
       
